@@ -1,0 +1,25 @@
+{
+  "name": "dadatypo/dada-antihack",
+  "description": "Early-request HTTP vector sanitization for any webste.",
+  "type": "library",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "dadaTypo\\dadaAntihack\\": "src/"
+    }
+  },
+  "require": {
+    "php": ">=8.0"
+  },
+  "require-dev": {
+    "pestphp/pest": "^2.0"
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "dadaTypo\\dadaAntihack\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "pest"
+  }
+}
