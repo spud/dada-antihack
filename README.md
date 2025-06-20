@@ -14,7 +14,8 @@
 use dadaTypo\dadaAntihack\Antihack;
 
 require 'vendor/autoload.php';
-Antihack::run();
+$firewall = new DadaAntihack(require '../rules/config.php');
+$firewall->inspect($_SERVER, $_GET, $_POST);
 ```
 
 ## Config
