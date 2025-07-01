@@ -1,18 +1,14 @@
 <?php
 /* ----------------------------------------------------------------
-// THIS IS THE USER-CONFIGURABLE SETTINGS FILE FOR dadaAntihack.php
-// IT WILL NOT BE OVERWRITTEN BY UPGRADES TO THE SCRIPT FILE
+// THIS IS THE DEFAULT SETTINGS FILE FOR DADAANTIHACK
+// It is designed to provide a useful example of the config
+// file structure, and the only active rules are uncontroversial
+// skript kiddie blocks for proof-of-concept.
 //
-// THE LOCATION OF THE dadaAntihack HOME DIRECTORY
-// IS AT THE BOTTOM OF THIS FILE. ALTER TO SUIT YOUR CONFIGURATION.
-//
-// ONE dadaAntihack.php CAN BE SHARED BY MANY SITES ON A SINGLE SERVER.
+// Include this file (or your own version) when initializing
+// the firewall with `new Antihack(include __DIR__.'antihack_rules.php')`
 -------------------------------------------------------------------*/
 return [
-
-	// A one-setting ON/OFF switch.
-	// Set this to "off" to disable the anti-hack processing
-	'on_off'=>'on',
 
 	// Alternate log file to use
 	'log_file'=>ini_get('error_log'),
@@ -27,7 +23,7 @@ return [
 		'user_agents'	=>403,
 		'referrers'		=>403,
 		'remote_ips'	=>403,
-		'get_values'	=>403,
+		'get_values'	=>404,
 		'get_blacklist'	=>403,
 		'get_whitelist'	=>403,
 		'post_values'	=>403,
@@ -36,7 +32,7 @@ return [
 	// The sort of page you want to display to the user upon blockage
 	// "false" => means that the user sees NO page other than the 'response' below
 	// "true" => means that the user will see whatever page your site would have displayed without dadaAntihack
-	// "/path/to/file.php" => If you specify a path on your site for a custom 404 page, that will be displayed
+	// "/path/to/404.php" => If you specify a path on your site for a custom 404 page, that will be displayed
 	// the first variable is the default for all the others if unspecified
 	'passthrough'=>[
 		'default'=>false,
@@ -49,7 +45,7 @@ return [
 	'response'=>[
 		'default'=>'<h1>Your page request was not permitted.</h1>',
 		'path'=>'Request path contained invalid strings',
-		'ip'=>'This IP has been blocked',
+		'ip'=>'This IP address has been blocked',
 		'agent'=>'This User-Agent has been blocked',
 		'ref'=>'Bad referrer',
 		'query'=>'Request query string contained invalid strings',
@@ -58,10 +54,10 @@ return [
 	'test'=>[
 
 		// 'path' allows you to block requests that contain a particular string in the URL
-		// Any request that includes "wp-includes" is, in anything other than WP, a hacking attempt
+		// e.g. any request that includes "wp-includes" is, in anything other than WP, a hacking attempt
 		'path'=>[
-			['s'=>'wp-', 'code'=>404, 'log'=>false, 'msg'=>'This is not WordPress'],
-			['s'=>'xmlrpc\.php', 'code'=>404, 'log'=>false, 'msg'=>'This is not WordPress'],
+//			['s'=>'wp-', 'code'=>404, 'log'=>false, 'msg'=>'This is not WordPress'],
+//			['s'=>'xmlrpc\.php', 'code'=>404, 'log'=>false, 'msg'=>'This is not WordPress'],
 			['s'=>'cgi-bin', 'code'=>404, 'log'=>false],
 			['s'=>'\.env', 'code'=>404, 'log'=>false],
 			['s'=>'\.git', 'code'=>404, 'log'=>false],
@@ -94,7 +90,7 @@ return [
 		// Matches any part of the REFERER of the page request
 		-------------------------------------------------------------------*/
 		'ref'=>[
-			['s'=>'evilsite\.com', 'code'=>403, 'log'=>true],
+			['s'=>'example\.[com|org]', 'code'=>403, 'log'=>true],
 		],
 
 		// QUERY STRING matches
@@ -102,7 +98,9 @@ return [
 		// Matches ANY PART of the QUERY_STRING e.g. "index.php?anything_here=the_query_string"
 		-------------------------------------------------------------------*/
 		'query'=>[
-			['s'=>'select.*from', 'code'=>404, 'log'=>true],
+			['s'=>'\.passwd', 'code'=>403, 'log'=>true],
+			['s'=>'\.env', 'code'=>403, 'log'=>true],
+			['s'=>'select.*%20from', 'code'=>403, 'log'=>true],
 		],
 
 		// $_GET VALUES (Illegal GET values)
@@ -139,7 +137,7 @@ return [
 		// Used when parameter name should NEVER appear in normal usage
 		-------------------------------------------------------------------*/
 		'get_blacklist'=>[
-			// Block any request that includes Google Analytics tracking parameters (unless you've set them up!)
+//			Block any request that includes Google Analytics tracking parameters (unless you've set them up!)
 //			['s'=>'^__utm', 'code'=>403, 'log'=>false, 'msg'=>'Google Analytics tracking not permitted'],
 		],
 
@@ -149,7 +147,8 @@ return [
 		// the entire request will be rejected with HTTP status code 'code'
 		-------------------------------------------------------------------*/
 		'get_whitelist'=>[
-//			['s'=>'^(id|page|sort)$', 'code'=>403, 'log'=>false],
+//			If 'id', 'page' and 'sort' should be the only GET params ever...
+//			['s'=>'^(id|page|sort)$', 'code'=>403, 'log'=>true],
 		],
 
 		// $_POST VALUES (Illegal POST values)
@@ -173,22 +172,22 @@ return [
 				'msg'=>'Function or tag not permitted in submission'
 			],
 			[
-				// Set a character limit of 5000 on "body" field submissions (change to suit your needs)
+				// Set a character limit of 50000 on "body" field submissions (change to suit your needs)
 				'check'=>'length',
 				's'=>'body',
-				'limit'=>10000,
+				'limit'=>50000,
 				'code'=>403,
 				'log'=>true,
 				'msg'=>'POST too long'
 			],
 			[
-				// Limit the number of URLs that can appear in the "body" field (change to suit your needs)
+				// Limit the number of URLs that can appear in the "summary" field (change to suit your needs)
 				'check'=>'links',
-				's'=>'body',
-				'limit'=>1,
+				's'=>'summary',
+				'limit'=>3,
 				'code'=>403,
 				'log'=>true,
-				'msg'=>'Too many URLs in POST'
+				'msg'=>'Too many URLs in POST summary'
 			]
 		]
 	]

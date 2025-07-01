@@ -8,52 +8,82 @@
 - Blocks based on HTTP vector (GET, POST, QUERY_STRING, etc.)
 - Sends appropriate HTTP status codes and messages
 
-## Usage
+## Standalone (WordPress or plain PHP) Usage
 
-### 1. Install via Composer
+1. Download [dadaAntihack.php](standalone/dadaAntihack.php) and [rules.php](config/antihack-rules-default.php).
+2. Upload both files to a folder in your web project (e.g., `wp-content/dada-antihack/`).
+3. In your `wp-config.php` (WordPress) or early in your app’s entry point, add:
+
+    ```
+    require_once \__DIR\__ . "/wp-content/dada-antihack/dadaAntihack.php";
+	$config = require \__DIR\__ . "/wp-content/dada-antihack/antihack-rules-default.php";
+	$firewall = new dadaAntihack($config);
+	$firewall->inspect($_SERVER, $_GET, $_POST);
+	```
+
+You may want to copy other rulesets from the `/config/` directory, or build your own.
+
+## Via Composer ##
+
+### 1. Install
 
     composer require dadatypo/dada-antihack
 
 ### 2. Copy the default configuration file
 
-Never edit files inside `/vendor/`. Composer may overwrite your changes during updates.
+Never edit files inside `/vendor/`. Composer may overwrite your changes during updates. For the purposes of example, these docs assume the `config` directory is at the same level as the index or bootstrap file, and paths are relative to the bootstrap file. So from the root-level of your website
 
-    cp vendor/dadatypo/dada-antihack/config/rules.php site/config/rules.php
+    cp vendor/dadatypo/dada-antihack/config/antihack-rules-default.php config/antihack-default-rules.php
+
+resulting in
+
+	index.php <-- bootstrap file where Antihack is instantiated
+	config/antihack-rules-default.php
 
 ### 3. (Optional) Install the admin config GUI
 
-This lets you edit firewall rules via a simple web interface.  
+This lets you edit firewall rules via a simple web interface.
 It's strongly recommended to protect this folder with HTTP authentication.
 
-    cp -r vendor/dadatypo/dada-antihack/admin/ site/dada-antihack-admin/
+    cp -r vendor/dadatypo/dada-antihack/admin/ antihack-admin/
 
 ### 4. Include your config and initialize the firewall
 
 Add the following to your application bootstrap (The routes.php file of Manifesto CMS will automatically detect the presence of /site/dada-antihack-rules.php):
 
-    require_once __DIR__ . '/../vendor/autoload.php';
-    $config = require __DIR__ . '/../site/config/dada-antihack-rules.php';
-    $antihack = new \dadaTypo\dadaAntihack\dadaAntihack($config);
+    require_once __DIR__ . '/vendor/autoload.php';
+    $config = require __DIR__ . '/config/antihack-rules-default.php';
+    $antihack = new \dadaTypo\dadaAntihack\Antihack($config);
     $antihack->inspect($_SERVER, $_GET, $_POST);
+
+### Example: Combining rulesets
+
+You can mix and match any rule files. For example:
+
+```php
+$firewall = new Antihack(
+    require __DIR__ . '/config/antihack-rules-default.php',
+    require __DIR__ . '/config/antihack-rules-owasp.php',
+    require __DIR__ . '/config/antihack-rules-not-wordpress.php'
+);
+```
 
 ### 5. Access the admin GUI in your browser
 
-The `index.php` file contains an HTTP username and password for basic security. Open and edit the credentials to something of your own choosing.
+The `index.php` file contains an HTTP username and password for basic security.
+ **Open and edit the credentials to something of your own choosing.**
 
-Visit:  
-`https://yourdomain.com/site/dada-antihack-admin/index.php`
+Visit:
+`https://yourdomain.com/antihack-admin/index.php`
 
 
 ## Config File Structure
 
-The admin GUI gives you an interface to generate the config file, but you can also simply edit the file manually. Edit `/site/config/dada-antihack-rules.php`
-to add your own patterns.
-
-The **`on_off`** setting is a simple toggle to disable running Antihack. You could also just remove or comment out the initialization code in your application.
+The admin GUI gives you an interface to generate the config file, but you can also simply edit the file manually. Create your own `/config/antihack-rules-mine.php` to add your own patterns. You can even maintain different sets of rules and load them selectively from your bootstrap file.
 
 The **`log_file`** setting allows you to configure a custom log file for dadaAntihack logging. It defaults to the current PHP error_log setting.
 
-dadaAntihack can analyze 8 vectors of attack: 
+dadaAntihack can analyze 8 vectors of attack:
 
 + **Path** values, meaning any string within the URL request
 + **IP Address**, which allows you to block specific IP addresses
@@ -76,9 +106,9 @@ There are user-configurable default values for each of these, so you can define 
 
 ### Rules
 
-A **rule** is an associative array that describes a regular expression string "`s`" to search for, and optional overrides to the default action to take. Rules are created for a _specific_ vector, e.g. `path`, and only applies to that vector. 
+A **rule** is an associative array that describes a regular expression string "`s`" to search for, and optional overrides to the default action to take. Rules are created for a _specific_ vector, e.g. `path`, and only applies to that vector.
 
-The full structure of a rule is 
+The full structure of a rule is
 
 	[
 	's' => '[regex to match]',
@@ -89,7 +119,7 @@ The full structure of a rule is
 
 The `s` value is a regular expression (_excluding_ the outer delimiter), so be sure to escape things like slashes, but do take advantage of features like `[0-9]+` to match patterns. The regex in the rule is delimited (somewhat unusually) by a `#` hash symbol, which means you do not need to escape forward slashes (but you must escape hash marks in your `s` value).
 
-For example, 
+For example,
 
 `['s'=>'/wp-includes', 'code'=>403, 'log'=>false, 'msg'=>'This is not WordPress']`
 

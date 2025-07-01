@@ -1,8 +1,7 @@
 <?php
-namespace dadaTypo\dadaAntihack;
-
 /**
  * Antihack class
+ *
  * Simple, early return PHP firewall for websites
  * Runs before framework loads, saving resources by
  * refusing invalid web requests before your web site
