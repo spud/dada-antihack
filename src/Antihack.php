@@ -134,7 +134,7 @@ class Antihack {
 			$rules = [['s' => $rules]];
 		}
 		foreach ($rules as $rule) {
-			$s = '/'.$rule['s'].'/i';
+			$s = '#'.$rule['s'].'#i';
 			if (!@preg_match($s, $key)) {
 				$this->block($rule, $type, $key);
 			}
@@ -153,13 +153,13 @@ class Antihack {
 			}
 
 			// If this key should NOT exceed $rule['limit'] characters, but does, reject the request
-			if ($rule['s'] == $key && $rule['check'] === 'length' && strlen($val) > ($rule['limit'] ?? 1000)) {
+			if ($rule['s'] == $key && $rule['check'] === 'length' && strlen($val) > ($rule['limit'] ?? 5000)) {
 				$this->block($rule, 'post_length', $val);
 			}
 
 			// If this key should NOT contain more than $rule['limit'] URLs, but does, reject the request
 			if ($rule['s'] == $key && $rule['check'] === 'links') {
-				$s = '/https?:\/\//i';
+				$s = '#https?://#i';
 				$count = preg_match_all($s, $val, $m);
 				if ($count > ($rule['limit'] ?? 1)) {
 					$this->block($rule, 'post_links', $val);
@@ -217,4 +217,5 @@ class Antihack {
 	protected function dadaQuickDecode(string $str): string {
 		return html_entity_decode(urldecode($str), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 	}
+
 }

@@ -65,15 +65,15 @@ return [
 			['s'=>'cgi-bin', 'code'=>404, 'log'=>false],
 			['s'=>'\.env', 'code'=>404, 'log'=>false],
 			['s'=>'\.git', 'code'=>404, 'log'=>false],
-			['s'=>'\/blog\/', 'code'=>404, 'log'=>false],
-			['s'=>'\/_ignition\/', 'code'=>404, 'log'=>false],
+			['s'=>'/blog/', 'code'=>404, 'log'=>false],
+			['s'=>'/_ignition/', 'code'=>404, 'log'=>false],
 		],
 
 		// REMOTE ADDRESS (User IP address) matches
 		/* ----------------------------------------------------------------
 		// Matches any part of the REMOTE_ADDR of the page request, e.g. "1\.2\.3\.4"
 		//
-		// YOU MUST ESCAPE CERTAIN CHARACTERS, NOTABLY "/" => "\/" and "." => "\."
+		// YOU MUST ESCAPE CERTAIN CHARACTERS, NOTABLY "#" => "\#" and "." => "\."
 		-------------------------------------------------------------------*/
 		'ip'=>[
 			['s'=>'^10\.0\.0\.', 'code'=>403, 'log'=>true],
@@ -83,7 +83,7 @@ return [
 		/* ----------------------------------------------------------------
 		// Matches any part of the USER-AGENT of the page request, e.g. "Googlebot"
 		//
-		// YOU MUST ESCAPE CERTAIN CHARACTERS, NOTABLY "/" => "\/" and "." => "\."
+		// YOU MUST ESCAPE CERTAIN CHARACTERS, NOTABLY "#" => "\#" and "." => "\."
 		-------------------------------------------------------------------*/
 		'agent'=>[
 			['s'=>'libwww-perl', 'code'=>403, 'log'=>true],
@@ -111,17 +111,17 @@ return [
 		// the entire request will be rejected with HTTP status code 'code'
 		//
 		// REMEMBER THAT YOU ARE WRITING REGULAR EXPRESSIONS, SO YOU MUST
-		// ESCAPE CERTAIN CHARACTERS, NOTABLY "/" => "\/" and "." => "\."
+		// ESCAPE CERTAIN CHARACTERS, NOTABLY "#" => "\#" and "." => "\."
 		-------------------------------------------------------------------*/
 		'get'=>[
 			['s'=>'base64_decode', 'code'=>403, 'log'=>true, 'msg'=>'Shell command attempt'],
-			['s'=>'\.\.\/', 'code'=>'404', 'log'=>true, 'msg'=>'File system hack'],
-			['s'=>'https?:\/\/', 'code'=>'404', 'log'=>false],
-			['s'=>'ftp:\/\/', 'code'=>'404', 'log'=>false],
+			['s'=>'\.\./', 'code'=>'404', 'log'=>true, 'msg'=>'File system hack'],
+			['s'=>'https?://', 'code'=>'404', 'log'=>false],
+			['s'=>'ftp://', 'code'=>'404', 'log'=>false],
 			// Stupid WP attempts
 			['s'=>'wp-', 'code'=>'404', 'log'=>true, 'msg'=>'File system hack'],
 			// One should never be passing web server root path parameters either
-			['s'=>'\/var\/www\/html', 'code'=>'404', 'log'=>true, 'msg'=>'File system hack'],
+			['s'=>'/var/www/html', 'code'=>'404', 'log'=>true, 'msg'=>'File system hack'],
 			// An easy way to protect against attempts at executing a remote download
 			['s'=>'wget', 'code'=>'404', 'log'=>true, 'msg'=>'Shell command attempt'],
 			// An easy way to protect against attempts executing shell commands
