@@ -10,21 +10,48 @@
 
 ## Usage
 
-```php
-use dadaTypo\dadaAntihack\Antihack;
+### 1. Install via Composer
 
-require 'vendor/autoload.php';
-$firewall = new Antihack(require '../rules/config.php');
-$firewall->inspect($_SERVER, $_GET, $_POST);
-```
+    composer require dadatypo/dada-antihack
 
-## Config
+### 2. Copy the default configuration file
 
-Edit `config/rules.php` to add your own patterns.
+Never edit files inside `/vendor/`. Composer may overwrite your changes during updates.
 
-The **on_off*** setting is a simple toggle to disable running Antihack. You could also just remove or comment out the initialization code in your application.
+    cp vendor/dadatypo/dada-antihack/config/rules.php site/config/rules.php
 
-The **log_file** setting allows you to configure a custom log file for dadaAntihack logging. It defaults to the current PHP error_log setting.
+### 3. (Optional) Install the admin config GUI
+
+This lets you edit firewall rules via a simple web interface.  
+It's strongly recommended to protect this folder with HTTP authentication.
+
+    cp -r vendor/dadatypo/dada-antihack/admin/ site/dada-antihack-admin/
+
+### 4. Include your config and initialize the firewall
+
+Add the following to your application bootstrap (The routes.php file of Manifesto CMS will automatically detect the presence of /site/dada-antihack-rules.php):
+
+    require_once __DIR__ . '/../vendor/autoload.php';
+    $config = require __DIR__ . '/../site/config/dada-antihack-rules.php';
+    $antihack = new \dadaTypo\dadaAntihack\dadaAntihack($config);
+    $antihack->inspect($_SERVER, $_GET, $_POST);
+
+### 5. Access the admin GUI in your browser
+
+The `index.php` file contains an HTTP username and password for basic security. Open and edit the credentials to something of your own choosing.
+
+Visit:  
+`https://yourdomain.com/site/dada-antihack-admin/index.php`
+
+
+## Config File Structure
+
+The admin GUI gives you an interface to generate the config file, but you can also simply edit the file manually. Edit `/site/config/dada-antihack-rules.php`
+to add your own patterns.
+
+The **`on_off`** setting is a simple toggle to disable running Antihack. You could also just remove or comment out the initialization code in your application.
+
+The **`log_file`** setting allows you to configure a custom log file for dadaAntihack logging. It defaults to the current PHP error_log setting.
 
 dadaAntihack can analyze 8 vectors of attack: 
 
@@ -41,21 +68,26 @@ Each vector can have its own set of rules, meaning you can configure dozens of c
 
 When a dadaAntihack rule is matched, there are a few options you can configure to respond:
 
-+ **Code**: Whether to respond with a 403 (Forbidden) or 404 (Page Not Found). Obvious hacking attempts usually deserve a 403, and mere nuisances like category-guessing usually respond with a 404.
-+ **Passthrough**: In addition to sending an HTTP status code, you have the option of either returning whatever output your output sends after interpreting the request, or returning a blank page containing only a default message, e.g. "Blocked"
-+ **Response**: The custom response message you want to show in place of the blocked request.
++ **`code`**: Whether to respond with a 403 (Forbidden) or 404 (Page Not Found). Obvious hacking attempts usually deserve a 403, and mere nuisances like category-guessing usually respond with a 404.
++ **`passthrough`**: In addition to sending an HTTP status code, you have the option of either returning whatever output your output sends after interpreting the request, or returning a blank page containing only a default message, e.g. "Blocked"
++ **`response`**: The custom response message you want to show in place of the blocked request.
 
 There are user-configurable default values for each of these, so you can define clear defaults and leave it at that, or you can customize the behavior on a per-rule basis.
 
 ### Rules
 
-A ##rule## is an associative array that describes a regular expression string "s" to search for, and optional overrides to the default action to take. Rules are created _for_ a particular vector, e.g. PATH, and only applies to that vector. 
+A **rule** is an associative array that describes a regular expression string "`s`" to search for, and optional overrides to the default action to take. Rules are created for a _specific_ vector, e.g. `path`, and only applies to that vector. 
 
 The full structure of a rule is 
 
-`['s'=>'[regex to match]', 'code'=>[403|404], 'log'=>[boolean], 'msg'=>'[response string]'`
+	[
+	's' => '[regex to match]',
+	'code' => 403|404,
+	'log' => true|false,
+	'msg' => '[response string]'
+	]
 
-The **s** value is a regular expression (_excluding_ the outer delimiter), so be sure to escape things like slashes, but do take advantage of features like [0-9]+. The value in the rule is delimited (somewhat unusually) by a # hash symbol, which means you do not need to escape forward slashes (but you must escape hash marks in your "s" value).
+The `s` value is a regular expression (_excluding_ the outer delimiter), so be sure to escape things like slashes, but do take advantage of features like `[0-9]+` to match patterns. The regex in the rule is delimited (somewhat unusually) by a `#` hash symbol, which means you do not need to escape forward slashes (but you must escape hash marks in your `s` value).
 
 For example, 
 
@@ -65,13 +97,14 @@ This rule would be matched if it encountered a URL like
 
 `https://www.example.com/wp-includes/cache.php`
 
-In this case, dadaAntihack would issue a 403 Forbidden status code, and would either
+In this case, dadaAntihack would issue a **`403 Forbidden`** status code, and would either
 
-1. Return a bare bones HTML document reading <h1>This is not WordPress</h1>
-if "passthrough" is set to **false** for the _path_ vector, or
-2. If "passthrough" is set to true, dadaAntihack will still return the 403 status code, but it will still display whatever 404 page is configured for your site, assuming there is no `wp-includes/cache.php` file on your site.
+1. Return a bare bones HTML document reading <h3>This is not WordPress</h3>
+if `passthrough` is set to **false** for the `path` vector, or
 
-Because "log" is set to _false_, the block will not be logged in the error log, since it is simply a nuisance skript kiddie request. Don't waste your bits.
+2. If `passthrough` is set to true, dadaAntihack will return the 403 status code, but it will still display whatever 404 page is configured for your site, since continuing to process the page resulted in a 404.
+
+Because `log` is set to _false_, the block will not be logged in the error log, since it is simply a nuisance skript kiddie request. Don't waste your bits.
 
 The config file is full of examples, most of which are active, so definitely review them before implementing the system (especially if you're using WordPress).
 
@@ -79,9 +112,9 @@ The GET whitelist and GET blacklist cannot, of course, be used at the same time.
 
 The POST values vector has a couple of unique rule elements:
 
-The ##check## element, if present, may be set to "empty" or "length" or "links". If any of those are set, then "s" is no longer a string to match, but the name of a POST field, e.g. "body" or "first_name".
+The **`check`** element, if present, may be set to "`empty`" or "`length`" or "`links`". If any of those are set, then `s` is no longer a string to match, but the name of a POST field, e.g. "`body`" or "`first_name`".
 
-+ If "check" is set to "empty" field named by "s" must ##not be empty##. If it is empty, the request is blocked.
-+ If "check" is "length", the character length of the value of the field named by "s" is evaluated. If the length exceeds the value defined by a "limit" element in the rule, e.g. 8000. If no "limit" is defined, dadaAntihack defaults to a 5000 character limit.
-+ Finally, if the check is "links", dadaAntihack will parse the value of the field named by "s", and will pattern-match to find URLs in the content. If the number of URLs in the content exceeds the value defined by the "limit" element (e.g. 2), the request is blocked. This can be used to filter out spam comments, for example, that often include many links.
++ If **`check`** is set to "`empty`" field named by `s` must **not be empty**. If it is empty, the request is blocked.
++ If **`check`** is "`length`", the character length of the value of the field named by `s` is evaluated. If the length exceeds the value defined by a "`limit`" element in the rule, e.g. 8000. If no "`limit`" is defined, dadaAntihack defaults to a 5000 character limit.
++ Finally, if the check is "`links`", dadaAntihack will parse the value of the field named by `s`, and will pattern-match to find URLs in the content. If the number of URLs in the content exceeds the value defined by the "`limit`" element (e.g. 2), the request is blocked. This can be used to filter out spam comments, for example, that often include many links.
 

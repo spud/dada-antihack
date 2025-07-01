@@ -1,11 +1,11 @@
 <?php
 use PHPUnit\Framework\ExpectationFailedException;
 
-require_once __DIR__.'/../../Antihack.php';
+require_once __DIR__.'/../src/Antihack.php';
 
 function runFirewall(array $overrides = [], array $get = [], array $post = [], array $server = []): string {
 	$config = array_replace_recursive(require __DIR__ . '/../config/rules.php', $overrides);
-    $fw = new Antihack($config);
+    $fw = new \DadaTypo\DadaAntihack\Antihack($config);
 
     ob_start();
     try {

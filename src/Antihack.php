@@ -176,7 +176,7 @@ class Antihack {
 		$pass = $this->config['passthrough'][$type] ?? $this->config['passthrough']['default'] ?? false;
 
 		if (!empty($rule['log'])) {
-			error_log("[Antihack] Blocked $type: value=$value | rule=" . ($rule['s'] ?? $rule['check'] ?? 'unknown'),3,$this->config['log_file']);
+			error_log("[Antihack] Blocked $type: value=$value | rule=".($rule['check'] ?? $rule['s'] ?? 'unknown').PHP_EOL, 3, $this->config['log_file']);
 		}
 
 		if (!$pass) {
@@ -184,9 +184,8 @@ class Antihack {
 				http_response_code($code);
 				header("Content-Type: text/html; charset=UTF-8");
 			}
-			echo 'Custom thing with msg '.$msg.PHP_EOL;
 			echo htmlspecialchars($msg, ENT_QUOTES | ENT_HTML5);
-//			exit;
+			exit;
 		}
 	}
 

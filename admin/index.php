@@ -12,7 +12,7 @@ if (!isset($_SERVER['PHP_AUTH_USER']) || !isset($_SERVER['PHP_AUTH_PW']) ||
 }
 
 
-$configFile = '../config/rules.php';
+$configFile = '../config/dada-antihack-rules.php';
 
 // Sections to show in the UI, with optional field defaults
 $sections = [
@@ -134,6 +134,15 @@ function print_global_table($config) {
         .delcol { width: 48px; }
         .msg { color: green; }
         .onoff { margin-bottom: 1em; }
+		.responsive-table {
+		  width: 100%;
+		  overflow-x: auto;
+		  display: block;
+		}
+		.responsive-table table {
+		  width: 100%;
+		  min-width: 600px; /* or however wide your widest table is */
+		}
     </style>
 </head>
 <body>
@@ -152,59 +161,110 @@ function print_global_table($config) {
         <?php print_global_table($config); ?>
 
         <?php foreach ($sections as $sec => $fields): ?>
-            <div class="section">
-            <h2><?=ucfirst(str_replace('_',' ',$sec))?> Rules</h2>
-            <table>
-                <tr>
-                    <th>Pattern/Param (s)</th>
-                    <?php foreach ($fields as $field => $def): if ($field=='s') continue; ?>
-                        <th><?=ucfirst($field)?></th>
-                    <?php endforeach ?>
-                    <th class="delcol">Delete</th>
-                </tr>
-                <?php
-                $rules = $config['test'][$sec] ?? [];
-                $rows = max(count($rules), 2); // Always show 2 blank for add
-                for ($i=0; $i < $rows+1; $i++) :
-                    $r = $rules[$i] ?? [];
-                ?>
-                <tr>
-                    <td>
-                        <input type="text" name="<?=$sec?>_s[]" value="<?=escape($r['s']??'')?>">
-                    </td>
-                    <?php foreach ($fields as $field => $def):
-                        if ($field=='s') continue;
-                        if ($sec === 'post' && $field==='check'): ?>
-                            <td>
-                                <select name="<?=$sec?>_check[]">
-                                    <option value="">(none)</option>
-                                    <?php foreach(['','length','links','empty'] as $v): ?>
-                                        <option value="<?=$v?>" <?=($r['check']??'')===$v?'selected':''?>><?=$v?></option>
-                                    <?php endforeach ?>
-                                </select>
-                            </td>
-                        <?php elseif ($sec === 'post' && $field==='limit'): ?>
-                            <td>
-                                <input type="number" name="<?=$sec?>_limit[]" value="<?=escape($r['limit']??'')?>">
-                            </td>
-                        <?php elseif ($field === 'log'): ?>
-                            <td>
-                                <input type="checkbox" name="<?=$sec?>_log[<?=$i?>]" value="1" <?=bool_checked($r['log']??false)?>>
-                            </td>
-                        <?php else: ?>
-                            <td>
-                                <input type="<?=is_numeric($def)?'number':'text'?>" name="<?=$sec?>_<?=$field?>[]" value="<?=escape($r[$field]??'')?>">
-                            </td>
-                        <?php endif;
-                    endforeach ?>
-                    <td class="delcol"><input type="checkbox" name="<?=$sec?>_delete[<?=$i?>]" value="1"></td>
-                </tr>
-                <?php endfor; ?>
-            </table>
-            </div>
+		<div class="section">
+			<h2><?=ucfirst(str_replace('_',' ',$sec))?> Rules</h2>
+			<table id="table-<?=$sec?>">
+				<tr>
+					<th>Pattern/Param (s)</th>
+					<?php foreach ($fields as $field => $def): if ($field=='s') continue; ?>
+						<th><?=ucfirst($field)?></th>
+					<?php endforeach ?>
+					<th class="delcol">Delete</th>
+				</tr>
+				<?php
+				$rules = $config['test'][$sec] ?? [];
+				$rows = count($rules);
+				for ($i=0; $i < $rows; $i++) :
+					$r = $rules[$i] ?? [];
+				?>
+				<tr>
+					<td>
+						<input type="text" name="<?=$sec?>_s[]" value="<?=escape($r['s']??'')?>">
+					</td>
+					<?php foreach ($fields as $field => $def):
+						if ($field=='s') continue;
+						if ($sec === 'post' && $field==='check'): ?>
+							<td>
+								<select name="<?=$sec?>_check[]">
+									<option value="">(none)</option>
+									<?php foreach(['','length','links','empty'] as $v): ?>
+										<option value="<?=$v?>" <?=($r['check']??'')===$v?'selected':''?>><?=$v?></option>
+									<?php endforeach ?>
+								</select>
+							</td>
+						<?php elseif ($sec === 'post' && $field==='limit'): ?>
+							<td>
+								<input type="number" name="<?=$sec?>_limit[]" value="<?=escape($r['limit']??'')?>">
+							</td>
+						<?php elseif ($field === 'log'): ?>
+							<td>
+								<input type="checkbox" name="<?=$sec?>_log[<?=$i?>]" value="1" <?=bool_checked($r['log']??false)?>>
+							</td>
+						<?php elseif ($field === 'code'): ?>
+							<td>
+								<select name="<?=$sec?>_<?=$field?>[]">
+									<option <?=($r[$field]??'')==='403'?'selected':''?>>403</option>
+									<option <?=($r[$field]??'')==='404'?'selected':''?>>404</option>
+								</select>
+								<input type="<?=is_numeric($def)?'number':'text'?>" name="<?=$sec?>_<?=$field?>[]" value="<?=escape($r[$field]??'')?>">
+							</td>
+						<?php else: ?>
+							<td>
+								<input type="<?=is_numeric($def)?'number':'text'?>" name="<?=$sec?>_<?=$field?>[]" value="<?=escape($r[$field]??'')?>">
+							</td>
+						<?php endif;
+					endforeach ?>
+					<td class="delcol"><input type="checkbox" name="<?=$sec?>_delete[<?=$i?>]" value="1"></td>
+				</tr>
+				<?php endfor; ?>
+				<!-- Template row for adding new ones -->
+				<tr class="template-row" id="tpl-<?=$sec?>" style="display:none">
+					<td><input type="text" name="<?=$sec?>_s[]" value=""></td>
+					<?php foreach ($fields as $field => $def):
+						if ($field=='s') continue;
+						if ($sec === 'post' && $field==='check'): ?>
+							<td>
+								<select name="<?=$sec?>_check[]">
+									<option value="">(none)</option>
+									<?php foreach(['','length','links','empty'] as $v): ?>
+										<option value="<?=$v?>"><?=$v?></option>
+									<?php endforeach ?>
+								</select>
+							</td>
+						<?php elseif ($sec === 'post' && $field==='limit'): ?>
+							<td>
+								<input type="number" name="<?=$sec?>_limit[]" value="">
+							</td>
+						<?php elseif ($field === 'log'): ?>
+							<td>
+								<input type="checkbox" name="<?=$sec?>_log[]" value="1">
+							</td>
+						<?php else: ?>
+							<td>
+								<input type="<?=is_numeric($def)?'number':'text'?>" name="<?=$sec?>_<?=$field?>[]" value="">
+							</td>
+						<?php endif;
+					endforeach ?>
+					<td class="delcol"><input type="checkbox" name="<?=$sec?>_delete[]" value="1"></td>
+				</tr>
+			</table>
+			<button type="button" onclick="addRow('<?=$sec?>')">Add Row</button>
+		</div>
         <?php endforeach; ?>
         <input type="submit" value="Save Config">
     </form>
     <p><em>Config file: <code><?=escape($configFile)?></code> &nbsp; | &nbsp; Backups in <code>backup/</code></em></p>
+	<script>
+	function addRow(section) {
+		var tpl = document.getElementById('tpl-' + section);
+		var clone = tpl.cloneNode(true);
+		clone.style.display = '';
+		clone.classList.remove('template-row');
+		// Place at end, but before the template row itself
+		var table = document.getElementById('table-' + section);
+		table.tBodies[0].insertBefore(clone, tpl);
+	}
+	</script>
+
 </body>
 </html>
