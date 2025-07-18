@@ -174,7 +174,7 @@ return [
 			[
 				// Set a character limit of 50000 on "body" field submissions (change to suit your needs)
 				'check'=>'length',
-				's'=>'body',
+				'f'=>'body',
 				'limit'=>50000,
 				'code'=>403,
 				'log'=>true,
@@ -183,7 +183,7 @@ return [
 			[
 				// Limit the number of URLs that can appear in the "summary" field (change to suit your needs)
 				'check'=>'links',
-				's'=>'summary',
+				'f'=>'summary',
 				'limit'=>3,
 				'code'=>403,
 				'log'=>true,

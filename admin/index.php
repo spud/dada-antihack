@@ -11,8 +11,30 @@ if (!isset($_SERVER['PHP_AUTH_USER']) || !isset($_SERVER['PHP_AUTH_PW']) ||
     exit;
 }
 
+$configDir = realpath(__DIR__ . '/../config/');
+if (!$configDir) die('Config dir not found');
 
-$configFile = '../config/dada-antihack-rules.php';
+$files = glob($configDir . '/antihack-rules-*.php');
+$fileList = [];
+foreach ($files as $f) {
+    $fileList[] = basename($f);
+}
+
+// Handle file selection (GET or POST for flexibility)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['configFile'])) {
+    $configFileBase = basename($_POST['configFile']);
+} elseif (isset($_GET['file'])) {
+    $configFileBase = basename($_GET['file']);
+} else {
+    $configFileBase = $fileList[0] ?? 'antihack-rules-default.php';
+}
+$configFile = $configDir . '/' . $configFileBase;
+
+// Fall back if missing
+if (!is_file($configFile)) {
+    $configFile = $configDir . '/antihack-rules-default.php';
+    $configFileBase = basename($configFile);
+}
 
 // Sections to show in the UI, with optional field defaults
 $sections = [
@@ -32,9 +54,6 @@ $sections = [
 $config = include $configFile;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
-    // Global ON/OFF
-    $config['on_off'] = ($_POST['on_off'] ?? 'off') === 'on' ? 'on' : 'off';
 
     // Codes, passthrough, response
     foreach (['code', 'passthrough', 'response'] as $cat) {
@@ -78,16 +97,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $rules[] = $rule;
             }
+        } elseif (isset($_POST[$sec.'_f'])) {
+            foreach ($_POST[$sec.'_f'] as $i => $pattern) {
+                // Deleted row
+                if (!empty($_POST[$sec.'_delete'][$i])) continue;
+                if (trim($pattern) === '') continue; // skip empty
+
+                $rule = ['f'=>trim($pattern)];
+                // Fill other fields
+                foreach ($defaults as $field => $def) {
+                    if ($field == 'f') continue;
+                    // POST section gets extra check/limit fields
+                    if ($sec === 'post' && in_array($field, ['check','limit'])) {
+                        $val = $_POST["{$sec}_{$field}"][$i] ?? '';
+                        if ($val !== '') $rule[$field] = $val;
+                        continue;
+                    }
+                    // log is a checkbox
+                    if ($field == 'log') {
+                        $rule[$field] = !empty($_POST["{$sec}_log"][$i]);
+                    } else {
+                        $rule[$field] = $_POST["{$sec}_$field"][$i] ?? $def;
+                    }
+                }
+                $rules[] = $rule;
+            }
         }
         $config['test'][$sec] = $rules;
     }
 
-    // Backup and Save
-    if (!is_dir('backup')) mkdir('backup');
-    copy($configFile, 'backup/config_'.date('Ymd_His').'.php');
-    file_put_contents($configFile, "<?php\nreturn " . var_export($config, true) . ";\n");
+    // Save as new file if requested
+    $newFile = trim($_POST['newConfigFile'] ?? '');
+    if ($newFile !== '') {
+        // Sanitize filename: allow only safe characters, force .php
+        $newFile = preg_replace('/[^a-zA-Z0-9_\-\.]/', '', $newFile);
+        if (substr($newFile, -4) !== '.php') $newFile .= '.php';
+        $saveFile = $configDir . '/' . $newFile;
+        $configFileBase = $newFile;
+    } else {
+        $saveFile = $configFile;
+    }
 
-    $message = "Config saved successfully!";
+    // Backup and Save
+    if (!is_dir($configDir . '/backup')) mkdir($configDir . '/backup', 0777, true);
+    if (is_file($saveFile)) {
+        copy($saveFile, $configDir . '/backup/' . basename($saveFile) . '_' . date('Ymd_His') . '.php');
+    }
+    file_put_contents($saveFile, "<?php\nreturn " . var_export($config, true) . ";\n");
+
+    $message = "Config saved successfully to <code>" . escape(basename($saveFile)) . "</code>!";
 }
 
 function escape($v) {
@@ -97,24 +155,49 @@ function bool_checked($v) {
     return ($v ? 'checked' : '');
 }
 function print_global_table($config) {
+    $fields = ['default','path','ip','agent','ref','query','get','get_blacklist','get_whitelist','post'];
+    $cats = ['code', 'passthrough', 'response'];
+
     ?>
     <table>
         <tr>
-            <th>Setting</th><th>Default</th><th>path</th><th>ip</th><th>agent</th>
-            <th>ref</th><th>query</th><th>get</th><th>get_blacklist</th><th>get_whitelist</th><th>post</th>
+            <th>Field</th>
+            <?php foreach ($cats as $cat): ?>
+                <th><?=ucfirst($cat)?></th>
+            <?php endforeach; ?>
         </tr>
-        <?php foreach (['code', 'passthrough', 'response'] as $cat): ?>
-        <tr>
-            <td><?=ucfirst($cat)?></td>
-            <?php
-                $row = $config[$cat] ?? [];
-                $fields = ['default','path','ip','agent','ref','query','get','get_blacklist','get_whitelist','post'];
-                foreach ($fields as $f) {
-                    echo '<td><input type="text" name="'.$cat.'['.$f.']" value="'.escape($row[$f] ?? '').'"></td>';
-                }
-            ?>
-        </tr>
-        <?php endforeach ?>
+        <?php foreach ($fields as $field): ?>
+            <tr>
+                <td><?=ucfirst(str_replace('_',' ',$field))?></td>
+                <?php foreach ($cats as $cat):
+                    $value = $config[$cat][$field] ?? '';
+                    $name = $cat.'['.$field.']';
+
+                    // "response" field gets a textarea for longer messages
+                    if ($cat === 'response') { ?>
+                        <td><textarea name="<?=escape($name)?>" rows="2" cols="50" style="width:99%"><?=escape($value)?></textarea></td>
+                    <?php }
+					elseif ($cat === 'code') { ?>
+						<td>
+							<select name="<?=$sec?>_<?=$field?>[]">
+								<option <?=($r[$field]??'')==='403'?'selected':''?>>403</option>
+								<option <?=($r[$field]??'')==='404'?'selected':''?>>404</option>
+							</select>
+						</td>
+                    <?php }
+                    // "passthrough" gets a checkbox (bool)
+                    elseif ($cat === 'passthrough') { ?>
+                        <td style="text-align:center;">
+                            <input type="checkbox" name="<?=escape($name)?>" value="1" <?=($value?'checked':'')?>>
+                        </td>
+                    <?php }
+                    // code is just number/text (there are none of these now)
+                    else { ?>
+                        <td><input type="text" name="<?=escape($name)?>" value="<?=escape($value)?>"></td>
+                    <?php }
+                endforeach; ?>
+            </tr>
+        <?php endforeach; ?>
     </table>
     <?php
 }
@@ -149,14 +232,19 @@ function print_global_table($config) {
     <h1>dadaAntihack Config Editor</h1>
     <?php if (!empty($message)) echo "<div class='msg'>$message</div>"; ?>
 
+	<form method="get" style="margin-bottom:1em">
+		<label>Config file:
+			<select name="file" onchange="this.form.submit()">
+				<?php foreach ($fileList as $fname): ?>
+					<option value="<?=escape($fname)?>" <?=$fname==$configFileBase?'selected':''?>><?=escape($fname)?></option>
+				<?php endforeach; ?>
+			</select>
+		</label>
+		<noscript><input type="submit" value="Load"></noscript>
+	</form>
     <form method="post" autocomplete="off">
-        <div class="onoff">
-            <label>
-                <input type="checkbox" name="on_off" value="on" <?=($config['on_off']??'')==='on'?'checked':''?>>
-                Enable dadaAntihack
-            </label>
-        </div>
 
+        <input type="hidden" name="configFile" value="<?=escape($configFileBase)?>">
         <h2>Global Settings</h2>
         <?php print_global_table($config); ?>
 
@@ -165,7 +253,10 @@ function print_global_table($config) {
 			<h2><?=ucfirst(str_replace('_',' ',$sec))?> Rules</h2>
 			<table id="table-<?=$sec?>">
 				<tr>
-					<th>Pattern/Param (s)</th>
+					<th>Pattern</th>
+					<?php if ($sec === 'post') { ?>
+						<th>Field (for checks)</th>
+					<?php } ?>
 					<?php foreach ($fields as $field => $def): if ($field=='s') continue; ?>
 						<th><?=ucfirst($field)?></th>
 					<?php endforeach ?>
@@ -181,6 +272,11 @@ function print_global_table($config) {
 					<td>
 						<input type="text" name="<?=$sec?>_s[]" value="<?=escape($r['s']??'')?>">
 					</td>
+					<?php if ($sec === 'post') { ?>
+					<td>
+						<input type="text" name="<?=$sec?>_f[]" value="<?=escape($r['f']??'')?>">
+					</td>
+					<?php } ?>
 					<?php foreach ($fields as $field => $def):
 						if ($field=='s') continue;
 						if ($sec === 'post' && $field==='check'): ?>
@@ -206,7 +302,6 @@ function print_global_table($config) {
 									<option <?=($r[$field]??'')==='403'?'selected':''?>>403</option>
 									<option <?=($r[$field]??'')==='404'?'selected':''?>>404</option>
 								</select>
-								<input type="<?=is_numeric($def)?'number':'text'?>" name="<?=$sec?>_<?=$field?>[]" value="<?=escape($r[$field]??'')?>">
 							</td>
 						<?php else: ?>
 							<td>
@@ -220,6 +315,9 @@ function print_global_table($config) {
 				<!-- Template row for adding new ones -->
 				<tr class="template-row" id="tpl-<?=$sec?>" style="display:none">
 					<td><input type="text" name="<?=$sec?>_s[]" value=""></td>
+					<?php if ($sec === 'post') { ?>
+						<td><input type="text" name="<?=$sec?>_f[]" value=""></td>
+					<?php } ?>
 					<?php foreach ($fields as $field => $def):
 						if ($field=='s') continue;
 						if ($sec === 'post' && $field==='check'): ?>
@@ -251,7 +349,11 @@ function print_global_table($config) {
 			<button type="button" onclick="addRow('<?=$sec?>')">Add Row</button>
 		</div>
         <?php endforeach; ?>
-        <input type="submit" value="Save Config">
+		<label>Save as new file:
+			<input type="text" name="newConfigFile" placeholder="antihack-rules-new.php" style="width:220px">
+		</label>
+		<br>
+		<input type="submit" value="Save Config">
     </form>
     <p><em>Config file: <code><?=escape($configFile)?></code> &nbsp; | &nbsp; Backups in <code>backup/</code></em></p>
 	<script>

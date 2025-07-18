@@ -63,10 +63,7 @@ class Antihack {
 
 		// For POST values, first look for matching values, then look for special cases (too long, )
 		if (($server['REQUEST_METHOD'] ?? '') === 'POST') {
-			foreach ($post as $key => $val) {
-				$this->checkVector('post', $this->decodeString($val));
-				$this->checkPostSpecials($key,$val);
-			}
+			$this->walkPostValues($post, 0);
 		}
 	}
 
@@ -86,9 +83,12 @@ class Antihack {
 			$rules = [['s' => $rules]];
 		}
 		foreach ($rules as $rule) {
-			$s = '/'.$rule['s'].'/i';
-			if (isset($rule['s']) && @preg_match($s, $value)) {
-			   $this->block($rule, $type, $value);
+			// Skip e.g. POST tests that have a "check" param
+			if (isset($rule['s'])) {
+				$s = '#'.$rule['s'].'#i';
+				if (isset($rule['s']) && @preg_match($s, $value)) {
+				   $this->block($rule, $type, $value);
+				}
 			}
 		}
 	}
@@ -121,7 +121,7 @@ class Antihack {
 		}
 		if ($baseurl === '') return;
 		foreach ($rules as $rule) {
-			$s = '/'.$rule['s'].'/i';
+			$s = '#'.$rule['s'].'#i';
 			if (isset($rule['s']) && @preg_match($s, $baseurl)) {
 			   $this->block($rule, 'path', $baseurl);
 			}
@@ -149,17 +149,17 @@ class Antihack {
 			if (!isset($rule['check'])) continue;
 
 			// If this key should NOT be empty but is, block the request
-			if ($rule['s'] == $key && $rule['check'] === 'empty' && empty($val)) {
+			if ($rule['f'] == $key && $rule['check'] === 'empty' && empty($val)) {
 				$this->block($rule, 'post_is_empty', $val);
 			}
 
 			// If this key should NOT exceed $rule['limit'] characters, but does, reject the request
-			if ($rule['s'] == $key && $rule['check'] === 'length' && strlen($val) > ($rule['limit'] ?? 5000)) {
+			if ($rule['f'] == $key && $rule['check'] === 'length' && strlen($val) > ($rule['limit'] ?? 5000)) {
 				$this->block($rule, 'post_length', $val);
 			}
 
 			// If this key should NOT contain more than $rule['limit'] URLs, but does, reject the request
-			if ($rule['s'] == $key && $rule['check'] === 'links') {
+			if ($rule['f'] == $key && $rule['check'] === 'links') {
 				$s = '#https?://#i';
 				$count = preg_match_all($s, $val, $m);
 				if ($count > ($rule['limit'] ?? 1)) {
@@ -169,6 +169,32 @@ class Antihack {
 		}
 	}
 
+	/**
+	 * Recursively walks the $_POST values up to 3 levels deep.
+	 * 
+	 * @param array|mixed $array The current (sub)array or value.
+	 * @param int $level Current recursion level (start at 0).
+	 * @param string|null $parentKey For building key paths (optional).
+	 */
+	protected function walkPostValues($array, $level = 0, $parentKey = null)
+	{
+		// Stop at 3 levels deep
+		if ($level >= 3) {
+			return;
+		}
+	
+		foreach ((array)$array as $key => $val) {
+			// Build full key path for special handling if needed
+			$fullKey = $parentKey === null ? $key : "{$parentKey}[{$key}]";
+			if (is_array($val)) {
+				$this->walkPostValues($val, $level + 1, $fullKey);
+			} else {
+				$this->checkVector('post', $this->decodeString($val));
+				$this->checkPostSpecials($fullKey, $val);
+			}
+		}
+	}
+	
 	protected function block(array $rule, string $type, string $value): void {
 
 		// Get default values or overrides
@@ -177,7 +203,7 @@ class Antihack {
 		$pass = $this->config['passthrough'][$type] ?? $this->config['passthrough']['default'] ?? false;
 
 		if (!empty($rule['log'])) {
-			error_log("[Antihack] Blocked $type: value=$value | rule=".($rule['check'] ?? $rule['s'] ?? 'unknown').PHP_EOL, 3, $this->config['log_file']);
+			error_log("[Antihack] Blocked b/c of $type: value=$value | rule=" . ($rule['s'] ?? $rule['check'] ?? 'unknown'),3,$this->config['log_file']);
 		}
 
 		if (!$pass) {
