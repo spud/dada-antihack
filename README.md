@@ -1,6 +1,6 @@
 # dadaAntihack
 
-**dadaAntihack** is a lightweight early-request filter designed for use in the Manifesto CMS or similar frameworks. It blocks malicious input patterns (SQL injection, XSS, etc.) before the app boots, allowing you to block invalid requests without the overload of loading your entire application framework.
+**dadaAntihack** is a lightweight early-request filter designed for use in the Manifesto CMS or similar frameworks. It blocks malicious input patterns (SQL injection, XSS, etc.) before the app boots, allowing you to block invalid requests without the overhead of loading your entire application framework. (For this reason, it cannot be implemented as a plugin, as it needs to precede the loading of the application framework).
 
 ## Features
 
@@ -37,13 +37,13 @@ Never edit files inside `/vendor/`. Composer may overwrite your changes during u
 
 resulting in
 
-	index.php <-- bootstrap file where Antihack is instantiated
+	index.php <-- or bootstrap file where Antihack is instantiated
 	config/antihack-rules-default.php
 
 ### 3. (Optional) Install the admin config GUI
 
-This lets you edit firewall rules via a simple web interface.
-It's strongly recommended to protect this folder with HTTP authentication.
+This admin GI lets you edit firewall rules via a simple web interface.
+It's **strongly** recommended to protect this folder with HTTP authentication.
 
     cp -r vendor/dadatypo/dada-antihack/admin/ antihack-admin/
 
@@ -90,17 +90,17 @@ dadaAntihack can analyze 8 vectors of attack:
 + **User Agent**, so you can block bad bots and crawlers
 + **Referer**, allowing you to block requests coming from a particular URL
 + **GET values**, the <em>value</em> of any $_GET parameter
-+ **GET whitelist**, allowing you to restrict permissible $_GET parameters
-+ **GET blacklist**, allowing you to block requests containing certain $_GET parameters
++ **GET whitelist**, allowing you to restrict permissible $_GET parameter names
++ **GET blacklist**, allowing you to block requests containing certain $_GET parameter names
 + **POST values**, which analyzes submitted POST values and can block requests based on their content, length, or even the number of links contained within
 
 Each vector can have its own set of rules, meaning you can configure dozens of checks on every page request.
 
-When a dadaAntihack rule is matched, there are a few options you can configure to respond:
+When a dadaAntihack rule is matched, there are a few options you can configure for the manner of response:
 
 + **`code`**: Whether to respond with a 403 (Forbidden) or 404 (Page Not Found). Obvious hacking attempts usually deserve a 403, and mere nuisances like category-guessing usually respond with a 404.
-+ **`passthrough`**: In addition to sending an HTTP status code, you have the option of either returning whatever output your output sends after interpreting the request, or returning a blank page containing only a default message, e.g. "Blocked"
-+ **`response`**: The custom response message you want to show in place of the blocked request.
++ **`passthrough`**: In addition to sending an HTTP status code, you have the option of either returning whatever output your server naturally sends after interpreting the request, or returning a blank page containing only a default message, e.g. "Blocked"
++ **`response`**: The custom response message you want to show in place of the blocked request message.
 
 There are user-configurable default values for each of these, so you can define clear defaults and leave it at that, or you can customize the behavior on a per-rule basis.
 
@@ -117,7 +117,7 @@ The full structure of a rule is
 	'msg' => '[response string]'
 	]
 
-The `s` value is a regular expression (_excluding_ the outer delimiter), so be sure to escape things like slashes, but do take advantage of features like `[0-9]+` to match patterns. The regex in the rule is delimited (somewhat unusually) by a `#` hash symbol, which means you do not need to escape forward slashes (but you must escape hash marks in your `s` value).
+The `s` value is a regular expression (_excluding_ the outer delimiter), so be sure to escape things like slashes, but do take advantage of features like `[0-9]+` to match patterns. The regex in the rule uses the non-standard `#` hash symbol for a delimiter which means you do _not_ need to escape forward slashes (but you must escape hash marks in your `s` value).
 
 For example,
 
@@ -132,9 +132,9 @@ In this case, dadaAntihack would issue a **`403 Forbidden`** status code, and wo
 1. Return a bare bones HTML document reading <h3>This is not WordPress</h3>
 if `passthrough` is set to **false** for the `path` vector, or
 
-2. If `passthrough` is set to true, dadaAntihack will return the 403 status code, but it will still display whatever 404 page is configured for your site, since continuing to process the page resulted in a 404.
+2. If `passthrough` is set to true, dadaAntihack will return the 403 status code, but it will still display whatever 404 template is configured for your site, since continuing to process the page as-is would have resulted in a 404 page anyway.
 
-Because `log` is set to _false_, the block will not be logged in the error log, since it is simply a nuisance skript kiddie request. Don't waste your bits.
+Because `log` is set to _false_, the block will not be logged in the error log, since it is simply a nuisance skript kiddie request. Don't waste the bits.
 
 The config file is full of examples, most of which are active, so definitely review them before implementing the system (especially if you're using WordPress).
 
