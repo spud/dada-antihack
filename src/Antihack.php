@@ -3,6 +3,7 @@ namespace dadaTypo\dadaAntihack;
 
 /**
  * Antihack class
+ *
  * Simple, early return PHP firewall for websites
  * Runs before framework loads, saving resources by
  * refusing invalid web requests before your web site
@@ -45,7 +46,7 @@ class Antihack {
 
 		// For GET values, first look for matching values, then look for matching parameter names
 		foreach ($get as $key => $val) {
-			$this->checkVector('get', $this->decodeString($val));
+			$this->walkGetValues($val);
 		}
 
 		// For GET whitelist, look at every GET parameter and reject the request if the parameter name is NOT on the whitelist
@@ -170,6 +171,23 @@ class Antihack {
 	}
 
 	/**
+	 * Recursively walk all GET values and check each string value.
+	 *
+	 * @param mixed $val
+	 * @return void
+	 */
+	protected function walkGetValues($val): void
+	{
+		if (is_array($val)) {
+			foreach ($val as $v) {
+				$this->walkGetValues($v);
+			}
+		} else {
+			$this->checkVector('get', $this->decodeString($val));
+		}
+	}
+	
+	/**
 	 * Recursively walks the $_POST values up to 3 levels deep.
 	 * 
 	 * @param array|mixed $array The current (sub)array or value.
@@ -212,6 +230,10 @@ class Antihack {
 				header("Content-Type: text/html; charset=UTF-8");
 			}
 			echo htmlspecialchars($msg, ENT_QUOTES | ENT_HTML5);
+			// Exceptional case for Unit Testing
+			if (getenv('APP_ENV') === 'testing') {
+				throw new \Manifesto\Core\Exceptions\InvalidRouteException('There be dragons.');
+			}
 			exit;
 		}
 	}

@@ -7,15 +7,34 @@
  * refusing invalid web requests before your web site
  * even finishes bootstrapping
  */
-class Antihack {
+class dadaAntihack {
 
 	protected array $config;
+	protected array $tests;
+
+	private static function mergeAntihackTestArrays(array ...$tests): array
+	{
+		$result = [];
+		foreach ($tests as $testarr) {
+			foreach ($testarr as $ruleType => $rules) {
+				if (!isset($result[$ruleType])) {
+					$result[$ruleType] = [];
+				}
+				// Only append if both sides are arrays (defensive)
+				if (is_array($rules)) {
+					$result[$ruleType] = array_merge($result[$ruleType], $rules);
+				}
+			}
+		}
+		return $result;
+	}
 
 	// Accepts multiple rulesets as constructor params
-	public function __construct(...$configs) {
-        $this->config = array_reduce($configs, function($carry, $item) {
-            return array_replace_recursive($carry, $item);
-        }, []);
+	
+	public function __construct($config,...$tests)
+	{
+		$this->config = $config;
+		$this->tests = self::mergeAntihackTestArrays(...$tests);
     }
 
 	/**
@@ -30,7 +49,7 @@ class Antihack {
 	{
 
 		// Check request path first
-		if (!empty($this->config['test']['path'])) {
+		if (!empty($this->tests['path'])) {
 			$this->checkPath($server);
 		}
 		// Check remote IP addresses first
@@ -44,16 +63,16 @@ class Antihack {
 
 		// For GET values, first look for matching values, then look for matching parameter names
 		foreach ($get as $key => $val) {
-			$this->checkVector('get', $this->decodeString($val));
+			$this->walkGetValues($val);
 		}
 
 		// For GET whitelist, look at every GET parameter and reject the request if the parameter name is NOT on the whitelist
-		if (!empty($this->config['test']['get_blacklist'])) {
+		if (!empty($this->tests['get_blacklist'])) {
 			foreach (array_keys($get) as $key) {
 				$this->checkVector('get_blacklist', $key);
 			}
 		} else {
-			if (!empty($this->config['test']['get_whitelist'])) {
+			if (!empty($this->tests['get_whitelist'])) {
 				foreach (array_keys($get) as $key) {
 					$this->checkWhitelist('get_whitelist', $key);
 				}
@@ -62,10 +81,7 @@ class Antihack {
 
 		// For POST values, first look for matching values, then look for special cases (too long, )
 		if (($server['REQUEST_METHOD'] ?? '') === 'POST') {
-			foreach ($post as $key => $val) {
-				$this->checkVector('post', $this->decodeString($val));
-				$this->checkPostSpecials($key,$val);
-			}
+			$this->walkPostValues($post, 0);
 		}
 	}
 
@@ -79,15 +95,18 @@ class Antihack {
 	 **/
 	protected function checkVector(string $type, string $value): void
 	{
-		$rules = $this->config['test'][$type] ?? [];
+		$rules = $this->tests[$type] ?? [];
 		// Convert a single string rule to array of rule
 		if (is_string($rules)) {
 			$rules = [['s' => $rules]];
 		}
 		foreach ($rules as $rule) {
-			$s = '/'.$rule['s'].'/i';
-			if (isset($rule['s']) && @preg_match($s, $value)) {
-			   $this->block($rule, $type, $value);
+			// Skip e.g. POST tests that have a "check" param
+			if (isset($rule['s'])) {
+				$s = '#'.$rule['s'].'#i';
+				if (isset($rule['s']) && @preg_match($s, $value)) {
+				   $this->block($rule, $type, $value);
+				}
 			}
 		}
 	}
@@ -101,7 +120,7 @@ class Antihack {
 	 **/
 	protected function checkPath($server): void
 	{
-		$rules = $this->config['test']['path'] ?? [];
+		$rules = $this->tests['path'] ?? [];
 		// Convert a single string rule to array of rule
 		if (is_string($rules)) {
 			$rules = [['s' => $rules]];
@@ -120,7 +139,7 @@ class Antihack {
 		}
 		if ($baseurl === '') return;
 		foreach ($rules as $rule) {
-			$s = '/'.$rule['s'].'/i';
+			$s = '#'.$rule['s'].'#i';
 			if (isset($rule['s']) && @preg_match($s, $baseurl)) {
 			   $this->block($rule, 'path', $baseurl);
 			}
@@ -128,7 +147,7 @@ class Antihack {
 	}
 
 	protected function checkWhitelist(string $type, string $key): void {
-		$rules = $this->config['test'][$type] ?? [];
+		$rules = $this->tests[$type] ?? [];
 		// Convert a single string rule to array of rule
 		if (is_string($rules)) {
 			$rules = [['s' => $rules]];
@@ -142,23 +161,23 @@ class Antihack {
 	}
 
 	protected function checkPostSpecials(string $key, string $val): void {
-		$rules = $this->config['test']['post'] ?? [];
+		$rules = $this->tests['post'] ?? [];
 		foreach ($rules as $rule) {
 			// We're only checking special checks, so if this isn't special, it's already been handled
 			if (!isset($rule['check'])) continue;
 
 			// If this key should NOT be empty but is, block the request
-			if ($rule['s'] == $key && $rule['check'] === 'empty' && empty($val)) {
+			if ($rule['f'] == $key && $rule['check'] === 'empty' && empty($val)) {
 				$this->block($rule, 'post_is_empty', $val);
 			}
 
 			// If this key should NOT exceed $rule['limit'] characters, but does, reject the request
-			if ($rule['s'] == $key && $rule['check'] === 'length' && strlen($val) > ($rule['limit'] ?? 5000)) {
+			if ($rule['f'] == $key && $rule['check'] === 'length' && strlen($val) > ($rule['limit'] ?? 5000)) {
 				$this->block($rule, 'post_length', $val);
 			}
 
 			// If this key should NOT contain more than $rule['limit'] URLs, but does, reject the request
-			if ($rule['s'] == $key && $rule['check'] === 'links') {
+			if ($rule['f'] == $key && $rule['check'] === 'links') {
 				$s = '#https?://#i';
 				$count = preg_match_all($s, $val, $m);
 				if ($count > ($rule['limit'] ?? 1)) {
@@ -168,6 +187,49 @@ class Antihack {
 		}
 	}
 
+	/**
+	 * Recursively walk all GET values and check each string value.
+	 *
+	 * @param mixed $val
+	 * @return void
+	 */
+	protected function walkGetValues($val): void
+	{
+		if (is_array($val)) {
+			foreach ($val as $v) {
+				$this->walkGetValues($v);
+			}
+		} else {
+			$this->checkVector('get', $this->decodeString($val));
+		}
+	}
+	
+	/**
+	 * Recursively walks the $_POST values up to 3 levels deep.
+	 * 
+	 * @param array|mixed $array The current (sub)array or value.
+	 * @param int $level Current recursion level (start at 0).
+	 * @param string|null $parentKey For building key paths (optional).
+	 */
+	protected function walkPostValues($array, $level = 0, $parentKey = null)
+	{
+		// Stop at 3 levels deep
+		if ($level >= 3) {
+			return;
+		}
+	
+		foreach ((array)$array as $key => $val) {
+			// Build full key path for special handling if needed
+			$fullKey = $parentKey === null ? $key : "{$parentKey}[{$key}]";
+			if (is_array($val)) {
+				$this->walkPostValues($val, $level + 1, $fullKey);
+			} else {
+				$this->checkVector('post', $this->decodeString($val));
+				$this->checkPostSpecials($fullKey, $val);
+			}
+		}
+	}
+	
 	protected function block(array $rule, string $type, string $value): void {
 
 		// Get default values or overrides
@@ -175,8 +237,12 @@ class Antihack {
 		$msg  = $rule['msg'] ?? $this->config['response'][$type] ?? $this->config['response']['default'] ?? '<h1>Blocked</h1>';
 		$pass = $this->config['passthrough'][$type] ?? $this->config['passthrough']['default'] ?? false;
 
-		if (!empty($rule['log'])) {
-			error_log("[Antihack] Blocked $type: value=$value | rule=".($rule['check'] ?? $rule['s'] ?? 'unknown').PHP_EOL, 3, $this->config['log_file']);
+		// Dry run logs blocks only; good for testing before production
+		if (isset($this->config['dryrun'])) {
+			error_log('['.date('d-M-Y H:i:s').'] '."Antihack blocked at vector '$type': value=$value | rule=" . ($rule['s'] ?? $rule['check'] ?? 'unknown').PHP_EOL,3,$this->config['log_file']);
+			$pass = true;
+		} elseif (!empty($rule['log'])) {
+			error_log('['.date('d-M-Y H:i:s').'] '."Antihack blocked at vector '$type': value=$value | rule=" . ($rule['s'] ?? $rule['check'] ?? 'unknown').PHP_EOL,3,$this->config['log_file']);
 		}
 
 		if (!$pass) {

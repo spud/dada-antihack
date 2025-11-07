@@ -38,16 +38,16 @@ if (!is_file($configFile)) {
 
 // Sections to show in the UI, with optional field defaults
 $sections = [
-    'path'          => ['s'=>'', 'code'=>404, 'log'=>false, 'msg'=>''],
-    'ip'            => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>''],
-    'agent'         => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>''],
-    'ref'           => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>''],
-    'query'         => ['s'=>'', 'code'=>404, 'log'=>false, 'msg'=>''],
-    'get'           => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>''],
-    'get_blacklist' => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>''],
-    'get_whitelist' => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>''],
+    'path'          => ['s'=>'', 'code'=>404, 'log'=>false, 'msg'=>null],
+    'ip'            => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>null],
+    'agent'         => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>null],
+    'ref'           => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>null],
+    'query'         => ['s'=>'', 'code'=>404, 'log'=>false, 'msg'=>null],
+    'get'           => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>null],
+    'get_blacklist' => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>null],
+    'get_whitelist' => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>null],
     // POST gets extra fields for special checks
-    'post'          => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>'', 'check'=>'', 'limit'=>''],
+    'post'          => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>null, 'check'=>'', 'limit'=>''],
 ];
 
 // Load for display
