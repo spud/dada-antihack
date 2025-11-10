@@ -42,7 +42,7 @@ resulting in
 
 ### 3. (Optional) Install the admin config GUI
 
-This admin GI lets you edit firewall rules via a simple web interface.
+This admin GUI lets you edit firewall rules via a simple web interface.
 It's **strongly** recommended to protect this folder with HTTP authentication.
 
     cp -r vendor/dadatypo/dada-antihack/admin/ antihack-admin/

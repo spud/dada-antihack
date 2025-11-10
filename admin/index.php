@@ -37,7 +37,7 @@ if (!is_file($configFile)) {
 }
 
 // Sections to show in the UI, with optional field defaults
-$sections = [
+$test_sections = [
     'path'          => ['s'=>'', 'code'=>404, 'log'=>false, 'msg'=>null],
     'ip'            => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>null],
     'agent'         => ['s'=>'', 'code'=>403, 'log'=>false, 'msg'=>null],
@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Each test section
-    foreach ($sections as $sec => $defaults) {
+    foreach ($test_sections as $sec => $defaults) {
         $rules = [];
         if (isset($_POST[$sec.'_s'])) {
             foreach ($_POST[$sec.'_s'] as $i => $pattern) {
@@ -248,7 +248,7 @@ function print_global_table($config) {
         <h2>Global Settings</h2>
         <?php print_global_table($config); ?>
 
-        <?php foreach ($sections as $sec => $fields): ?>
+        <?php foreach ($test_sections as $sec => $fields): ?>
 		<div class="section">
 			<h2><?=ucfirst(str_replace('_',' ',$sec))?> Rules</h2>
 			<table id="table-<?=$sec?>">
