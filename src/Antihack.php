@@ -11,13 +11,72 @@ namespace dadaTypo\dadaAntihack;
  */
 class Antihack {
 
+	protected string $site;
 	protected array $config;
 
+/**
+ * PHP ≥ 8.1
+ 
+	protected static function deepMerge(...$arrays) {
+		$merged = [];
+		foreach ($arrays as $array) {
+			foreach ($array as $key => $value) {
+				if (is_array($value) && isset($merged[$key]) && is_array($merged[$key])) {
+					// If both sides are arrays
+					if (array_is_list($value) && array_is_list($merged[$key])) {
+						// Both are numeric-indexed: append
+						$merged[$key] = array_merge($merged[$key], $value);
+					} else {
+						// At least one associative: recurse
+						$merged[$key] = self::deepMerge($merged[$key], $value);
+					}
+				} else {
+					// Replace scalar or first assignment
+					$merged[$key] = $value;
+				}
+			}
+		}
+		return $merged;
+	}
+*/
+	protected static function deepMerge(...$arrays) {
+		$merged = [];
+		foreach ($arrays as $array) {
+			foreach ($array as $key => $value) {
+	
+				// If both sides are arrays
+				if (is_array($value) && isset($merged[$key]) && is_array($merged[$key])) {
+	
+					// Determine if both arrays are "lists" (numeric keys only, sequential)
+					$isListA = array_keys($merged[$key]) === range(0, count($merged[$key]) - 1);
+					$isListB = array_keys($value) === range(0, count($value) - 1);
+	
+					if ($isListA && $isListB) {
+						// Both numeric-indexed → append
+						$merged[$key] = array_merge($merged[$key], $value);
+					} else {
+						// At least one associative → recurse
+						$merged[$key] = self::deepMerge($merged[$key], $value);
+					}
+	
+				} else {
+					// Replace scalar or first assignment
+					$merged[$key] = $value;
+				}
+			}
+		}
+		return $merged;
+	}
+	
 	// Accepts multiple rulesets as constructor params
-	public function __construct(...$configs) {
+	public function __construct($site='siteIdentifier',...$configs) {
+		$this->site = $site;
+		$this->config = self::deepMerge(...$configs);
+/*
         $this->config = array_reduce($configs, function($carry, $item) {
             return array_replace_recursive($carry, $item);
         }, []);
+*/
     }
 
 	/**
@@ -221,8 +280,26 @@ class Antihack {
 		$pass = $this->config['passthrough'][$type] ?? $this->config['passthrough']['default'] ?? false;
 
 		if (!empty($rule['log'])) {
-			error_log("[Antihack] Blocked b/c of $type: value=$value | rule=" . ($rule['s'] ?? $rule['check'] ?? 'unknown'),3,$this->config['log_file']);
-		}
+			$ip   = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+			$uri  = $_SERVER['REQUEST_URI'] ?? '';
+			$excerpt = $this->buildLogExcerpt($value, $rule['s'] ?? null, 50); // 50-char window
+			$ruleText = $excerpt ?? $rule['check'] ?? 'unknown';
+			$code  = $rule['code'] ?? 404;
+			$timestamp = date('[d/M/Y:H:i:s O]');
+		
+			$logLine = sprintf(
+				"%s ip=%s site=%s type=%s rule=%s uri=\"%s\" code=%d\n",
+				$timestamp,
+				$ip,
+				$this->site,
+				$type,
+				$ruleText,
+				$uri,
+				$code
+			);
+		
+			error_log($logLine, 3, $this->config['log_file']);
+		}		
 
 		if (!$pass) {
 			if (!headers_sent()) {
@@ -260,6 +337,60 @@ class Antihack {
 
 	protected function checkHex(string $hex): string {
 		return $this->checkDec(hexdec($hex));
+	}
+
+	/**
+	 * Build a short, contextual excerpt for logging.
+	 * - If $pattern provided and matches, center the window on the match and highlight it.
+	 * - Otherwise, return the first $total chars.
+	 */
+	protected function buildLogExcerpt(string $value, ?string $pattern, int $total = 50): string
+	{
+		// Make logs single-line and predictable
+		$clean = trim(preg_replace('/\s+/u', ' ', $value));
+	
+		// If we have a rule pattern, try to center on the first match
+		if ($pattern) {
+			$regex = '#'.$pattern.'#iu'; // match your earlier usage, UTF-8 + case-insensitive
+			if (@preg_match($regex, $clean, $m, PREG_OFFSET_CAPTURE)) {
+				[$match, $bytePos] = $m[0];
+				$matchLenBytes = strlen($match);
+	
+				// Window size (never smaller than the match)
+				$window = max($total, $matchLenBytes);
+	
+				// Start the window roughly centered on the match
+				$start = max(0, $bytePos - (int) floor(($window - $matchLenBytes) / 2));
+	
+				// UTF-8 safe byte slicing if available
+				if (function_exists('mb_strcut')) {
+					$snippet = mb_strcut($clean, $start, $window, 'UTF-8');
+				} else {
+					$snippet = substr($clean, $start, $window);
+				}
+	
+				// Highlight the first occurrence inside the snippet
+				$highlighted = @preg_replace($regex, '«$0»', $snippet, 1);
+	
+				// Ellipsize when trimmed
+				$prefix = $start > 0 ? '…' : '';
+				$suffix = ($start + strlen($snippet) < strlen($clean)) ? '…' : '';
+	
+				// Ensure final length isn’t excessive
+				$out = $prefix . $highlighted . $suffix;
+				if (function_exists('mb_strimwidth')) {
+					return mb_strimwidth($out, 0, $total + 3, '…', 'UTF-8'); // +3 for possible ellipses
+				}
+				return (strlen($out) > $total + 3) ? substr($out, 0, $total) . '…' : $out;
+			}
+		}
+	
+		// No pattern or no match: just head of the string
+		if (function_exists('mb_strimwidth')) {
+			return mb_strimwidth($clean, 0, $total, '…', 'UTF-8');
+		}
+		$head = substr($clean, 0, $total);
+		return (strlen($clean) > $total) ? $head . '…' : $head;
 	}
 
 }

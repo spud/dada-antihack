@@ -6,7 +6,7 @@
 // skript kiddie blocks for proof-of-concept.
 //
 // Include this file (or your own version) when initializing
-// the firewall with `new Antihack(include __DIR__.'antihack-rules-default.php')`
+// the firewall with `new Antihack('siteIdentifier',include __DIR__.'antihack-rules-default.php')`
 -------------------------------------------------------------------*/
 return [
 
@@ -80,6 +80,7 @@ return [
 		-------------------------------------------------------------------*/
 		'agent'=>[
 			['s'=>'libwww-perl', 'code'=>403, 'log'=>true],
+			['s'=>'GPTBot|CCBot|Claude|ChatGPT|Perplexity|Anthropic', 'code'=>403, 'log'=>true, 'msg'=>'AI bot blocked'],
 		],
 	
 		// REFERRER (referring page) matches
@@ -181,7 +182,7 @@ return [
 				// Limit the number of URLs that can appear in the "summary" field (change to suit your needs)
 				'check'=>'links',
 				'f'=>'summary',
-				'limit'=>3,
+				'limit'=>10,
 				'code'=>403,
 				'log'=>true,
 				'msg'=>'Too many URLs in POST summary'
